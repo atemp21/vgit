@@ -1,23 +1,23 @@
+import click
+
+from app.virtual_branch import VGitError
+from app.cli import vbm, command_name
 import os
 import sys
 
-import click
 
-from virtual_branch import VGitError
-
-from cli import vbm, command, command_name
-
-
-@command()
+@click.command()
 @click.argument("branchname", required=False)
 @click.option("-d", "--delete", is_flag=True, help="Delete a branch")
-@click.option("-r", "--rename", "rename", is_flag=True, help="Rename a branch")
-@click.option("-l", "--list", "list", is_flag=True, help="List all branches")
+@click.option("-r", "--rename", is_flag=True, help="Rename a branch")
+@click.option(
+    "-l", "--list-branches", "list_branches", is_flag=True, help="List all branches"
+)
 def branch(
     branchname: str | None = None,
-    delete: bool | None = None,
-    rename: bool | None = None,
-    list: bool | None = None,
+    delete: bool = False,
+    rename: bool = False,
+    list_branches: bool = False,
 ) -> int:
     """List, create, delete, or rename branches.
     
@@ -26,7 +26,7 @@ def branch(
     
     Commands:
       <branchname>         Create a new branch with the given name
-      -l, --list           List all branches (default)
+      -l, --list-branches  List all branches (default)
       -d, --delete <name>  Delete the specified branch
       -r, --rename <name>  Rename a branch (will prompt for new name)
     
@@ -47,11 +47,9 @@ def branch(
         )
         return 1
 
-    cmd = command_name()
-
     try:
         # List branches (default action)
-        if list or not any([delete, rename, branchname]):
+        if list_branches or not any([delete, rename, branchname]):
             current_branch = vbm.current_branch
             all_branches = list(vbm.branches.keys())
 
@@ -78,11 +76,7 @@ def branch(
             return 0
 
         # Handle branch deletion
-        if delete:
-            if not branchname:
-                click.echo("fatal: branch name required", err=True)
-                return 1
-
+        if delete and branchname:
             if branchname not in vbm.branches:
                 click.echo(f"error: branch '{branchname}' not found.", err=True)
                 return 1
@@ -93,16 +87,14 @@ def branch(
                 )
                 return 1
 
-            vbm.delete_branch(branchname, force=True)
+            # Remove the branch
+            del vbm.branches[branchname]
+            vbm._save_state()
             click.echo(f"Deleted branch {branchname}")
             return 0
 
         # Handle branch renaming
-        if rename:
-            if not branchname:
-                click.echo("fatal: current branch name required", err=True)
-                return 1
-
+        if rename and branchname:
             new_name = click.prompt("Enter new branch name")
 
             if not new_name:
@@ -115,7 +107,20 @@ def branch(
                 )
                 return 1
 
-            vbm.rename_branch(branchname, new_name)
+            if branchname not in vbm.branches:
+                click.echo(f"fatal: branch '{branchname}' not found.", err=True)
+                return 1
+
+            # Rename the branch
+            branch = vbm.branches.pop(branchname)
+            branch.name = new_name
+            vbm.branches[new_name] = branch
+
+            # Update current branch if needed
+            if vbm.current_branch == branchname:
+                vbm.current_branch = new_name
+
+            vbm._save_state()
             click.echo(f"Renamed {branchname} to {new_name}")
             return 0
 
@@ -127,7 +132,7 @@ def branch(
         click.echo(f"error: {e}", err=True)
         return 1
     except Exception as e:
-        click.echo(f"{cmd}: unexpected error: {e}", err=True)
+        click.echo(f"{command_name()}: unexpected error: {e}", err=True)
         if os.environ.get("DEBUG"):
             import traceback
 

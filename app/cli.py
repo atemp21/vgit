@@ -1,12 +1,11 @@
 import os
 import sys
 from collections.abc import Callable
-from functools import wraps
 from typing import Any, TypeVar
 
 import click
 
-from virtual_branch import VGitError, VirtualBranchManager
+from app.virtual_branch import VGitError, VirtualBranchManager
 
 T = TypeVar("T", bound=Callable[..., Any])
 
@@ -28,18 +27,19 @@ def format_help_text(text: str) -> str:
     return text.replace("vgit", _command_name)
 
 
-def command(*args: Any, **kwargs: Any) -> Callable[[T], T]:
-    if "help" in kwargs:
-        kwargs["help"] = format_help_text(kwargs["help"])
+from typing import TypeVar, Callable, Any, cast
 
-    def decorator(f: T) -> T:
-        @wraps(f)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return f(*args, **kwargs)
+# Define the command function type variable
+F = TypeVar("F", bound=Callable[..., Any])
 
-        return wrapper
 
-    return click.command(*args, **kwargs)(decorator)
+def command(*args: Any, **kwargs: Any) -> Callable[[F], F]:
+    """Decorator to register a command with the CLI."""
+
+    def decorator(f: F) -> F:
+        return cast(F, f)
+
+    return decorator
 
 
 def ensure_initialized() -> bool:
@@ -94,13 +94,15 @@ def create_cli() -> click.Group:
         invoke_without_command=True,
     )
 
-    @cli.pass_context
+    @click.pass_context
     def process_context(ctx: click.Context) -> None:
         # Set the command name for error messages
-        if ctx.parent is not None:
-            set_command_name(f"{ctx.parent.info_name} {ctx.info_name}")
-        else:
-            set_command_name(ctx.info_name)
+        cmd_name = ""
+        if ctx.parent and ctx.parent.info_name:
+            cmd_name += f"{ctx.parent.info_name} "
+        if ctx.info_name:
+            cmd_name += ctx.info_name
+        set_command_name(cmd_name or "vgit")
 
         # Show help if no command is provided
         if ctx.invoked_subcommand is None:
@@ -112,25 +114,25 @@ def create_cli() -> click.Group:
             if not ensure_initialized():
                 ctx.exit(1)
 
-    from .commands import (
-        init,
-        commit,
-        branch,
-        status,
-        add,
-        unstage,
-        push,
-        log,
-    )
+    # Import command functions directly from their modules
+    from .commands.init import init as init_cmd
+    from .commands.commit import commit as commit_cmd
+    from .commands.branch import branch as branch_cmd
+    from .commands.status import status as status_cmd
+    from .commands.add import add as add_cmd
+    from .commands.log import log as log_cmd
+    from .commands.push import push as push_cmd
+    from .commands.unstage import unstage as unstage_cmd
 
-    cli.add_command(init.init)
-    cli.add_command(commit.commit)
-    cli.add_command(branch.branch)
-    cli.add_command(status.status)
-    cli.add_command(add.add)
-    cli.add_command(unstage.unstage)
-    cli.add_command(push.push)
-    cli.add_command(log.log)
+    # Register commands
+    cli.add_command(init_cmd, name="init")
+    cli.add_command(commit_cmd, name="commit")
+    cli.add_command(branch_cmd, name="branch")
+    cli.add_command(status_cmd, name="status")
+    cli.add_command(add_cmd, name="add")
+    cli.add_command(log_cmd, name="log")
+    cli.add_command(push_cmd, name="push")
+    cli.add_command(unstage_cmd, name="unstage")
 
     return cli
 

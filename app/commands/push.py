@@ -5,11 +5,11 @@ If the branch doesn't exist on the remote, it will be created and set up to trac
 """
 
 import click
-from virtual_branch import VGitError
-from cli import vbm, command
+from app.virtual_branch import VGitError
+from app.cli import vbm
 
 
-@command()
+@click.command()
 @click.option(
     "--force",
     "-f",
@@ -50,38 +50,29 @@ def push(force: bool, dry_run: bool, remote: str, branch: str | None) -> int:
         target_branch = branch or current_branch
 
         # Check if branch exists on remote
-        branch_exists = vbm.branch_exists_on_remote(target_branch, remote)
+        branch_exists = vbm.branch_exists_on_remote(target_branch)
 
-        # Push the branch
-        result = vbm.push_branch(
-            branch=target_branch,
-            remote=remote,
-            force=force,
-            dry_run=dry_run,
-            setup_tracking=not branch_exists,
-        )
+        try:
+            if dry_run:
+                click.echo(f"Would push '{target_branch}' to '{remote}'")
+                return 0
 
-        if dry_run:
-            click.echo("Dry run. Would push the following commits:")
-            for commit in result.get("commits", []):
-                click.echo(
-                    f"  {commit['hash'][:7]} {commit['message'].splitlines()[0]}"
-                )
-            return 0
-
-        if result.get("success", False):
-            if branch_exists:
-                click.echo(f"Successfully pushed to {remote}/{target_branch}")
-            else:
-                click.echo(
-                    f"Created new branch {target_branch} on {remote} and set up tracking"
-                )
-            return 0
-        else:
-            click.echo(
-                f"Failed to push to {remote}: {result.get('error', 'Unknown error')}",
-                err=True,
+            # Push the branch
+            vbm.push_branch(
+                local_branch=target_branch, remote_branch=target_branch, force=force
             )
+
+            if not branch_exists:
+                click.echo(
+                    f"Branch '{target_branch}' set up to track remote branch '{target_branch}' from '{remote}'."
+                )
+            else:
+                click.echo(f"Successfully pushed to {remote}/{target_branch}")
+
+            return 0
+
+        except VGitError as e:
+            click.echo(f"Push failed: {str(e)}", err=True)
             return 1
 
     except VGitError as e:

@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from vgit.virtual_branch import VirtualBranch, VirtualBranchManager
+from app.virtual_branch import VirtualBranch, VirtualBranchManager
 
 
 class TestVirtualBranch(unittest.TestCase):

@@ -6,10 +6,10 @@ import os
 import click
 from git import Repo
 
-from cli import vbm, command, command_name
+from app.cli import vbm, command_name
 
 
-@command()
+@click.command()
 @click.argument("directory", type=click.Path(), required=False)
 def init(directory: str | None) -> int:
     """Initialize a new VGit repository.
@@ -17,7 +17,7 @@ def init(directory: str | None) -> int:
     Creates an empty Git repository with VGit-specific configuration.
     
     Usage:
-      {cmd} [<directory>]
+      vgit init [<directory>]
     
     If <directory> is provided, creates the repository there.
     Otherwise, initializes in the current directory.

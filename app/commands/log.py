@@ -3,8 +3,8 @@
 import click
 from datetime import datetime
 
-from cli import vbm, command
-from virtual_branch import VGitError
+from app.cli import vbm
+from app.virtual_branch import VGitError
 
 
 def format_commit(commit: dict) -> str:
@@ -29,7 +29,7 @@ def format_commit(commit: dict) -> str:
     )
 
 
-@command()
+@click.command()
 @click.option("-n", "--max-count", type=int, help="Limit number of commits to show")
 @click.option("--oneline", is_flag=True, help="Show each commit on a single line")
 @click.option("--stat", is_flag=True, help="Show stats about files changed")
@@ -57,33 +57,33 @@ def log(
         return 1
 
     try:
-        # Get commit history
-        commits = vbm.get_commit_history(
-            max_count=max_count, revision_range=revision_range
-        )
+        # Get commit history for the current branch
+        commits = vbm.get_commit_history(limit=max_count or 100)
 
         if not commits:
             click.echo("No commits yet")
             return 0
 
         # Display commits
-        for i, commit in enumerate(commits):
+        for commit in commits:
             if oneline:
                 # Show abbreviated hash and first line of message
-                short_hash = commit["hash"][:7]
-                first_line = commit["message"].strip().split("\n")[0]
-                click.echo(f"{short_hash} {first_line}")
-            else:
-                click.echo(format_commit(commit))
+                click.echo(f"{commit['id'][:7]} {commit['message'].splitlines()[0]}")
+            elif stat:
+                # Show stats about changes (simplified version)
+                click.echo(f"commit {commit['id']}")
+                click.echo(f"Author: {commit['author']}")
+                click.echo(f"Date:   {commit['date']}\n")
 
-            # Show stats if requested
-            if stat and "stats" in commit:
-                stats = commit["stats"]
-                for file, changes in stats.items():
-                    click.echo(
-                        f" {changes.get('insertions', 0):>3} +| {changes.get('deletions', 0):<3} | {file}"
-                    )
-                click.echo()
+                # Note: Full diff stats would require more complex git operations
+                # This is a simplified version
+                click.echo("  (stat output not implemented in this version)\n")
+            else:
+                # Show full commit details (simplified)
+                click.echo(f"commit {commit['id']}")
+                click.echo(f"Author: {commit['author']}")
+                click.echo(f"Date:   {commit['date']}\n")
+                click.echo(f"    {commit['message'].splitlines()[0]}\n")
 
         return 0
 

@@ -1,12 +1,11 @@
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
 import json
-
-if TYPE_CHECKING:
-    from git import Repo
+import git
+from git import Actor, Repo
+from typing import Any
 
 
 class VGitError(Exception):
@@ -91,7 +90,7 @@ class VirtualBranchManager:
             self.repo: Repo | None = git.Repo(self.repo_path)
             self._load_state()
         except git.InvalidGitRepositoryError:
-            self.repo = None
+            pass
 
     def _ensure_vgit_dir(self) -> None:
         """Ensure the .vgit directory exists."""
@@ -137,7 +136,7 @@ class VirtualBranchManager:
         else:
             # Initialize with a main branch if none exists
             if not self.branches:
-                self.branches["main"] = VirtualBranch("main")
+                self.branches["main"] = VirtualBranch(name="main")
                 self.current_branch = "main"
 
         self._initialized = True
@@ -153,7 +152,7 @@ class VirtualBranchManager:
 
                 # Initialize virtual branches
                 if not self._initialized:
-                    self.branches["main"] = VirtualBranch("main")
+                    self.branches["main"] = VirtualBranch(name="main")
                     self.current_branch = "main"
                     self._initialized = True
                     self._save_state()
@@ -208,7 +207,7 @@ class VirtualBranchManager:
         # In a real implementation, this would update the working directory
         # to match the state of the virtual branch
 
-    def create_commit(self, message: str, author: str | None = None) -> Commit:
+    def create_commit(self, message: str, author: Actor | None = None) -> Commit:
         """Create a new commit on the current branch.
 
         Args:
@@ -234,18 +233,19 @@ class VirtualBranchManager:
         # Stage all changes
         self.repo.git.add(A=True)
 
-        # Create commit
-        author = (
-            author
-            or f"{self.repo.config_reader().get_value('user', 'name', '')} <{self.repo.config_reader().get_value('user', 'email', '')}>"
-        )
-        commit = self.repo.index.commit(message, author=author, committer=author)
+        # Create commit with proper Actor objects
+        if not author:
+            name = str(self.repo.config_reader().get_value("user", "name", ""))
+            email = str(self.repo.config_reader().get_value("user", "email", ""))
+            author = Actor(name, email)
+
+        commit = self.repo.index.commit(message, author=author)
 
         # Create virtual commit
         virtual_commit = Commit(
             id=commit.hexsha,
             message=message,
-            author=author,
+            author=author.name,  # type: ignore
             timestamp=commit.committed_date,
             parent_ids=[p.hexsha for p in commit.parents],
             metadata={
@@ -263,7 +263,7 @@ class VirtualBranchManager:
 
         return virtual_commit
 
-    def get_status(self) -> dict:
+    def get_status(self) -> dict[str, Any]:
         """Get the current repository status.
 
         Returns:
@@ -277,7 +277,7 @@ class VirtualBranchManager:
         if not self.repo:
             return {"status": "not_a_git_repo"}
 
-        status = {
+        status: dict[str, Any] = {
             "current_branch": self.current_branch,
             "untracked_files": [],
             "changes_not_staged": [],
@@ -292,27 +292,27 @@ class VirtualBranchManager:
 
             # Get changes not staged for commit
             status["changes_not_staged"] = [
-                item.a_path for item in self.repo.index.diff(None)
+                diff.a_path for diff in self.repo.index.diff(None)
             ]
 
-            # Get changes staged for commit
+            # Get changes to be committed
             status["changes_to_be_committed"] = [
-                item.a_path for item in self.repo.index.diff("HEAD")
+                diff.a_path for diff in self.repo.index.diff("HEAD")
             ]
 
-            # Get ahead/behind info if tracking remote
-            if self.current_branch and self.current_branch in self.repo.heads:
+            # Get ahead/behind info for the current branch
+            if self.current_branch:
                 head = self.repo.heads[self.current_branch]
                 if head.tracking_branch():
                     # Count commits ahead/behind
                     commits_ahead = list(
                         self.repo.iter_commits(
-                            f"{head.tracking_branch().name}..{head.name}"
+                            f"{head.tracking_branch().name}..{head.name}"  # type: ignore
                         )
                     )
                     commits_behind = list(
                         self.repo.iter_commits(
-                            f"{head.name}..{head.tracking_branch().name}"
+                            f"{head.name}..{head.tracking_branch().name}"  # type: ignore
                         )
                     )
 
@@ -320,6 +320,111 @@ class VirtualBranchManager:
                     status["behind"] = len(commits_behind)
 
         except Exception as e:
-            raise VGitError(f"Error getting status: {e}")
+            # If there's any error getting the status, just return what we have
+            status["error"] = str(e)
 
         return status
+
+    def unstage_all(self) -> None:
+        """Unstage all changes in the index."""
+        if not self.repo:
+            raise VGitError("Not a Git repository.")
+        self.repo.git.reset()
+
+    def unstage(self, paths: list[str]) -> None:
+        """Unstage specific files from the index.
+
+        Args:
+            paths: List of file paths to unstage
+        """
+        if not self.repo:
+            raise VGitError("Not a Git repository.")
+        self.repo.git.reset("--", *paths)
+
+    def get_current_branch(self) -> str | None:
+        """Get the name of the current branch.
+
+        Returns:
+            Name of the current branch, or None if not on any branch
+        """
+        return self.current_branch
+
+    def branch_exists_on_remote(self, branch_name: str) -> bool:
+        """Check if a branch exists on the remote.
+
+        Args:
+            branch_name: Name of the branch to check
+
+        Returns:
+            True if the branch exists on the remote, False otherwise
+        """
+        if not self.repo:
+            return False
+
+        try:
+            remote_refs = self.repo.git.ls_remote(
+                "--heads", "origin", branch_name
+            ).split()
+            return bool(remote_refs)
+        except Exception:
+            return False
+
+    def push_branch(
+        self, local_branch: str, remote_branch: str | None = None, force: bool = False
+    ) -> None:
+        """Push a branch to the remote repository.
+
+        Args:
+            local_branch: Name of the local branch to push
+            remote_branch: Name of the remote branch (defaults to same as local_branch)
+            force: Whether to force push
+
+        Raises:
+            VGitError: If there's an error pushing to the remote
+        """
+        if not self.repo:
+            raise VGitError("Not a Git repository.")
+
+        remote_branch = remote_branch or local_branch
+        try:
+            if force:
+                self.repo.git.push(
+                    "origin", f"{local_branch}:{remote_branch}", "--force"
+                )
+            else:
+                self.repo.git.push("origin", f"{local_branch}:{remote_branch}")
+        except Exception as e:
+            raise VGitError(f"Failed to push branch: {str(e)}")
+
+    def get_commit_history(
+        self, branch_name: str | None = None, limit: int = 100
+    ) -> list[dict]:
+        """Get the commit history for a branch.
+
+        Args:
+            branch_name: Name of the branch to get history for (defaults to current branch)
+            limit: Maximum number of commits to return
+
+        Returns:
+            List of commit dictionaries with id, message, author, and date
+        """
+        if not self.repo:
+            raise VGitError("Not a Git repository.")
+
+        branch_name = branch_name or self.current_branch
+        if not branch_name:
+            raise VGitError("No branch is currently checked out.")
+
+        try:
+            commits = list(self.repo.iter_commits(branch_name, max_count=limit))
+            return [
+                {
+                    "id": commit.hexsha,
+                    "message": commit.message.strip(),
+                    "author": str(commit.author),
+                    "date": commit.committed_datetime.isoformat(),
+                }
+                for commit in commits
+            ]
+        except Exception as e:
+            raise VGitError(f"Failed to get commit history: {str(e)}")

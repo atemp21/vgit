@@ -8,11 +8,11 @@ format:
 
 # Lint code with flake8
 lint:
-	poetry run flake8 src tests --select=F401
+	poetry run flake8 app tests --select=F401
 
 # Type checking with mypy
 type:
-	poetry run mypy src
+	poetry run mypy app
 
 # Run tests
 test:
@@ -20,7 +20,7 @@ test:
 
 # Run tests with coverage
 test-cov:
-	poetry run pytest --cov=src --cov-report=term-missing tests/
+	poetry run pytest --cov=app --cov-report=term-missing tests/
 
 # Run all checks (format, lint, type)
 check: format lint type

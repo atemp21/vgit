@@ -3,12 +3,12 @@
 import os
 import click
 
-from virtual_branch import VGitError
-from cli import vbm, command
+from app.virtual_branch import VGitError
+from app.cli import vbm
 
 
-@command()
-@click.argument("pathspec", nargs=-1, required=False)
+@click.command()
+@click.argument("pathspec", nargs=-1, type=click.Path())
 @click.option("--all", "all_files", is_flag=True, help="Unstage all changes")
 def unstage(pathspec: tuple[str, ...] = (), all_files: bool = False) -> int:
     """Unstage changes in the index.
@@ -16,8 +16,8 @@ def unstage(pathspec: tuple[str, ...] = (), all_files: bool = False) -> int:
     Moves changes from the index back to the working directory.
 
     Examples:
-      vgit unstage <file>    # Unstage specific file
-      vgit unstage .         # Unstage all changes in current directory
+        vgit unstage <file>    # Unstage specific file
+        vgit unstage .         # Unstage all changes in current directory
       vgit unstage --all     # Unstage all changes
     """
     if not vbm.repo:

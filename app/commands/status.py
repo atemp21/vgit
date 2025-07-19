@@ -3,21 +3,21 @@
 import os
 import click
 
-from virtual_branch import VGitError
-from cli import vbm, command
+from app.virtual_branch import VGitError
+from app.cli import vbm
 
 
-@command()
-@click.argument("pathspec", nargs=-1, required=False)
+@click.command()
+@click.argument("pathspec", nargs=-1, type=click.Path())
 def status(pathspec: tuple[str, ...] = ()) -> int:
     """Show the working tree status.
 
     Shows which changes are staged, unstaged, and untracked.
 
     Example:
-      On branch main
+        On branch main
 
-      Changes to be committed:
+        Changes to be committed:
         (use "vgit unstage <file>..." to unstage)
                 new file:   example.txt
 

@@ -4,18 +4,29 @@ import os
 
 import click
 
-from virtual_branch import VGitError
+from app.virtual_branch import VGitError
+from app.cli import vbm, command_name
 
-from cli import vbm, command, command_name
 
-
-@command()
-@click.option("-i", "--interactive", is_flag=True, help="Interactive mode")
-@click.option("-e", "--edit", is_flag=True, help="Edit current diff and apply")
-@click.argument("pathspec", nargs=-1, type=click.Path())
+@click.command()
+@click.option(
+    "-i", "--interactive", is_flag=True, help="Interactive mode (not implemented)"
+)
+@click.option(
+    "-e", "--edit", is_flag=True, help="Edit current diff and apply (not implemented)"
+)
+@click.option("-v", "--verbose", is_flag=True, help="Be verbose")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Don't actually add the file(s), just show if they exist.",
+)
+@click.argument("pathspec", nargs=-1, type=click.Path(exists=True))
 def add(
-    interactive: bool | None = None,
-    edit: bool | None = None,
+    interactive: bool = False,
+    edit: bool = False,
+    verbose: bool = False,
+    dry_run: bool = False,
     pathspec: tuple[str, ...] = (),
 ) -> int:
     """Add file contents to the staging area.
@@ -75,34 +86,24 @@ def add(
         for path in file_paths:
             # Handle directory paths
             if os.path.isdir(path):
-                if verbose:
-                    click.echo(f"add '{path}/'")
-                if not dry_run:
-                    index.add([path])
+                click.echo(f"add '{path}/'")
+                index.add([path])
                 added_files.append(f"{path}/")
             # Handle file paths
             elif os.path.exists(path):
-                if verbose:
-                    click.echo(f"add '{path}'")
-                if not dry_run:
-                    index.add([path])
+                click.echo(f"add '{path}'")
+                index.add([path])
                 added_files.append(path)
             # Handle missing files
-            elif not ignore_missing:
-                if not ignore_errors:
-                    click.echo(
-                        f"fatal: pathspec '{path}' did not match any files", err=True
-                    )
-                    return 1
-                if verbose:
-                    click.echo(f"pathspec '{path}' did not match any files", err=True)
+            else:
+                click.echo(
+                    f"fatal: pathspec '{path}' did not match any files", err=True
+                )
+                return 1
 
-        # Write the index if not a dry run
-        if not dry_run and added_files:
+        # Write the index
+        if added_files:
             index.write()
-
-        # Show summary if verbose
-        if verbose and added_files:
             click.echo(f"Added {len(added_files)} files to the index.")
 
         return 0

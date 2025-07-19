@@ -6,14 +6,14 @@ import sys
 
 import click
 
-from virtual_branch import VGitError
+from app.virtual_branch import VGitError
 
 # Get the global virtual branch manager instance
-from cli import vbm, command, command_name
+from app.cli import vbm, command_name
 
 
-@command()
-@click.option("-m", "--message", "message", help="Commit message")
+@click.command()
+@click.option("-m", "--message", help="Commit message")
 @click.option("--allow-empty", is_flag=True, help="Allow empty commit")
 @click.argument("pathspec", nargs=-1)
 def commit(
@@ -138,7 +138,7 @@ def commit(
         )
 
         # Show branch info if this is the first commit
-        if len(vbm.branches[vbm.current_branch].commits) == 1:
+        if len(vbm.branches[vbm.current_branch].commits) == 1:  # type: ignore
             click.echo(f"(root-commit) {commit.id}")
 
         return 0
