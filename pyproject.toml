@@ -1,0 +1,39 @@
+[project]
+name = "vgit"
+version = "0.1.0"
+description = "A simpler Git workflow with virtual branches"
+authors = [
+    {name = "Aaron Templeton", email = "aaron.templeton@live.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click (>=8.2.1,<9.0.0)",
+    "types-click (>=7.1.8,<8.0.0)",
+    "gitpython (>=3.1.44,<4.0.0)"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "types-click>=7.1.8,<8.0.0",
+    "types-setuptools>=65.0.0"
+]
+
+[tool.poetry]
+packages = [{include = "vgit", from = "src"}]
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.16.1"
+black = "^25.1.0"
+flake8 = "^7.3.0"
+
+[project.scripts]
+vgit = "vgit.cli:main"
+vg = "vgit.cli:main"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
