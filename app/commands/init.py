@@ -1,12 +1,10 @@
 """Initialize a new VGit repository."""
 
 import os
-
-
 import click
 from git import Repo
-
-from app.cli import vbm, command_name
+from app.virtual_branch_manager import vbm
+from app.utils.command_utils import get_command_name
 
 
 @click.command()
@@ -29,16 +27,19 @@ def init(directory: str | None) -> int:
       {cmd}           # Initialize in current directory
       {cmd} myproject  # Initialize in myproject directory
     """.format(
-        cmd=command_name()
+        cmd=get_command_name()
     )
-    cmd = command_name()
+    cmd = get_command_name()
 
     try:
         # If directory is provided, use it as the repo path
         if directory:
             repo_path = os.path.abspath(directory)
-            if not os.path.exists(repo_path):
+            try:
                 os.makedirs(repo_path, exist_ok=True)
+            except OSError as e:
+                click.echo(f"{cmd}: {e}", err=True)
+                return 1
         else:
             repo_path = os.getcwd()
 
@@ -52,7 +53,29 @@ def init(directory: str | None) -> int:
 
         # Initialize the VGit repository
         vbm.repo = repo
-        vbm.initialize_repo()
+
+        # Create .vgit directory if it doesn't exist
+        vgit_dir = os.path.join(repo_path, ".vgit")
+        try:
+            os.makedirs(vgit_dir, exist_ok=True)
+        except OSError as e:
+            click.echo(f"{cmd}: Failed to create .vgit directory: {e}", err=True)
+            return 1
+
+        # Initialize the VGit repository
+        try:
+            vbm.initialize_repo()
+        except Exception as e:
+            click.echo(f"{cmd}: Failed to initialize VGit repository: {e}", err=True)
+            return 1
+
+        # Create an initial commit if the repository is empty
+        try:
+            if not repo.heads:
+                repo.index.commit("Initial commit")
+        except Exception as e:
+            click.echo(f"{cmd}: Failed to create initial commit: {e}", err=True)
+            return 1
 
         click.echo(f"Initialized empty VGit repository in {repo_path}/")
         return 0

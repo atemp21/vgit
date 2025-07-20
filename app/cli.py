@@ -5,26 +5,15 @@ from typing import Any, TypeVar
 
 import click
 
-from app.virtual_branch import VGitError, VirtualBranchManager
+from app.virtual_branch import VGitError
+from app.virtual_branch_manager import vbm
+from app.utils.command_utils import get_command_name, set_command_name
 
 T = TypeVar("T", bound=Callable[..., Any])
 
-vbm = VirtualBranchManager()
-
-_command_name = "vgit"
-
-
-def command_name() -> str:
-    return _command_name
-
-
-def set_command_name(name: str) -> None:
-    global _command_name
-    _command_name = name
-
 
 def format_help_text(text: str) -> str:
-    return text.replace("vgit", _command_name)
+    return text.replace("vgit", get_command_name())
 
 
 from typing import TypeVar, Callable, Any, cast
@@ -45,7 +34,7 @@ def command(*args: Any, **kwargs: Any) -> Callable[[F], F]:
 def ensure_initialized() -> bool:
     if not vbm.repo:
         click.echo("fatal: not a git repository (or any of the parent directories)")
-        click.echo(f"Run '{command_name()} init' to initialize a new repository.")
+        click.echo(f"Run '{get_command_name()} init' to initialize a new repository.")
         return False
 
     if not hasattr(vbm, "_initialized") or not vbm._initialized:
@@ -102,7 +91,7 @@ def create_cli() -> click.Group:
             cmd_name += f"{ctx.parent.info_name} "
         if ctx.info_name:
             cmd_name += ctx.info_name
-        set_command_name(cmd_name or "vgit")
+        set_command_name(cmd_name or get_command_name())
 
         # Show help if no command is provided
         if ctx.invoked_subcommand is None:
@@ -114,24 +103,26 @@ def create_cli() -> click.Group:
             if not ensure_initialized():
                 ctx.exit(1)
 
-    # Import command functions directly from their modules
-    from .commands.init import init as init_cmd
-    from .commands.commit import commit as commit_cmd
-    from .commands.branch import branch as branch_cmd
-    from .commands.status import status as status_cmd
-    from .commands.add import add as add_cmd
-    from .commands.log import log as log_cmd
-    from .commands.push import push as push_cmd
-    from .commands.unstage import unstage as unstage_cmd
+    # Import all commands directly
+    from .commands import (
+        init as init_cmd,
+        commit as commit_cmd,
+        branch as branch_cmd,
+        status as status_cmd,
+        add as add_cmd,
+        push as push_cmd,
+        log as log_cmd,
+        unstage as unstage_cmd,
+    )
 
-    # Register commands
+    # Register all commands
     cli.add_command(init_cmd, name="init")
     cli.add_command(commit_cmd, name="commit")
     cli.add_command(branch_cmd, name="branch")
     cli.add_command(status_cmd, name="status")
     cli.add_command(add_cmd, name="add")
-    cli.add_command(log_cmd, name="log")
     cli.add_command(push_cmd, name="push")
+    cli.add_command(log_cmd, name="log")
     cli.add_command(unstage_cmd, name="unstage")
 
     return cli
@@ -153,7 +144,7 @@ def main() -> None:
         click.echo(f"error: {e}", err=True)
         sys.exit(1)
     except Exception as e:
-        click.echo(f"{command_name()}: unexpected error: {e}", err=True)
+        click.echo(f"{get_command_name()}: unexpected error: {e}", err=True)
         if os.environ.get("DEBUG"):
             import traceback
 

@@ -9,7 +9,8 @@ import click
 from app.virtual_branch import VGitError
 
 # Get the global virtual branch manager instance
-from app.cli import vbm, command_name
+from app.virtual_branch_manager import vbm
+from app.utils.command_utils import get_command_name
 
 
 @click.command()
@@ -42,18 +43,18 @@ def commit(
     
     Note: Changes must be staged with `{cmd} add` before committing.
     """.format(
-        cmd=command_name()
+        cmd=get_command_name()
     )
 
     if not vbm.repo:
         click.echo(
             "fatal: not a git repository (or any of the parent directories)", err=True
         )
-        click.echo(f"fatal: {command_name()}")
+        click.echo(f"fatal: {get_command_name()}")
         return 1
 
     # Get the command name for messages
-    cmd = command_name()
+    cmd = get_command_name()
 
     # Get the Git repository
     repo = vbm.repo

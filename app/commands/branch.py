@@ -1,7 +1,8 @@
 import click
 
 from app.virtual_branch import VGitError
-from app.cli import vbm, command_name
+from app.virtual_branch_manager import vbm
+from app.utils.command_utils import get_command_name
 import os
 import sys
 
@@ -38,7 +39,7 @@ def branch(
     
     Note: Branch names must follow git's naming conventions.
     """.format(
-        cmd=command_name()
+        cmd=get_command_name()
     )
 
     if not vbm.repo:
@@ -132,7 +133,7 @@ def branch(
         click.echo(f"error: {e}", err=True)
         return 1
     except Exception as e:
-        click.echo(f"{command_name()}: unexpected error: {e}", err=True)
+        click.echo(f"{get_command_name()}: unexpected error: {e}", err=True)
         if os.environ.get("DEBUG"):
             import traceback
 

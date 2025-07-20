@@ -4,7 +4,7 @@ import os
 import click
 
 from app.virtual_branch import VGitError
-from app.cli import vbm
+from app.virtual_branch_manager import vbm
 
 
 @click.command()

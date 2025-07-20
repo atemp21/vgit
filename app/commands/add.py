@@ -5,7 +5,8 @@ import os
 import click
 
 from app.virtual_branch import VGitError
-from app.cli import vbm, command_name
+from app.virtual_branch_manager import vbm
+from app.utils.command_utils import get_command_name
 
 
 @click.command()
@@ -54,7 +55,7 @@ def add(
     Note: This is a simplified version of git-add. For more advanced features,
     please use the git command directly.
     """.format(
-        cmd=command_name()
+        cmd=get_command_name()
     )
 
     if not vbm.repo:
@@ -63,7 +64,7 @@ def add(
         )
         return 1
 
-    cmd = command_name()
+    cmd = get_command_name()
 
     try:
         # Handle interactive/patch mode
