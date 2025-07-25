@@ -85,11 +85,13 @@ class VirtualBranchManager:
         self.branches: dict[str, VirtualBranch] = {}
         self.current_branch: str | None = None
         self._initialized = False
+        self.repo: Repo | None = None
 
         try:
-            self.repo: Repo | None = git.Repo(self.repo_path)
+            self.repo = git.Repo(self.repo_path)
             self._load_state()
         except git.InvalidGitRepositoryError:
+            # self.repo remains None
             pass
 
     def _ensure_vgit_dir(self) -> None:
